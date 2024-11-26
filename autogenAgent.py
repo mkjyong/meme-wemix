@@ -5,7 +5,7 @@ from autogen import AssistantAgent, UserProxyAgent, ConversableAgent
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from blockchain import deploy_token, check_connection
-
+from langdetect import detect
 
 os.environ['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
 
@@ -24,10 +24,15 @@ prompt_template = """
 당신의 역할은 주어진 데이터를 게임, 커뮤니티, 밈코인을 주제로 이 코인이 가질 효과를 분석하여 전문가 어조로 제공하는 것입니다.
 주어진 데이터가 은유적 표현이라도 잘 이해할 수 있으면 좋겠어.
 
+주어진 언어를 아래 규칙에 따라 응답해 주세요:
+1. 영어로 입력되면 영어로, 한국어로 입력되면 한국어로 대답하세요.
+2. 분석 및 결과는 반드시 주어진 언어로 작성해야 합니다.
+
 데이터: {data}
+언어 : {lang}
 
 이후, 데이터를 기반으로 토큰 이름과 심볼을 생성하세요. 
-생성된 결과는 반드시 아래의 형식으로만 작성하세요:
+생성된 결과는 반드시 아래의 JSON 형식으로만 작성하세요:
 
 {{
   "analysis": "여기에 분석 내용을 작성하세요. (200자 이내)",
@@ -58,9 +63,12 @@ class UserInput(BaseModel):
 @app.post("/process")
 async def process_input(input_data: UserInput):
     try:
+        input_language = detect(input_data.user_input)
+
         # 사용자 요청 처리
         user_message = prompt_template.format(
-            data=input_data.user_input
+            data=input_data.user_input,
+            lang=input_language,
         )
 
         # 프롬프트 실행
@@ -92,4 +100,3 @@ async def process_input(input_data: UserInput):
         raise HTTPException(status_code=400, detail="Invalid JSON format in response")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
