@@ -1,7 +1,7 @@
 import os
 import json
 
-from autogen import AssistantAgent, UserProxyAgent
+from autogen import AssistantAgent, UserProxyAgent, ConversableAgent
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from blockchain import deploy_token, check_connection
@@ -67,8 +67,8 @@ async def process_input(input_data: UserInput):
         response = user_proxy.initiate_chat(
             assistant,
             message=user_message,
-            auto_reply=True,  # 사용자 입력 없이 자동으로 진행
-            human_input_mode="auto"  # 사용자 입력 없이 자동 응답
+            human_input_mode="NEVER",  # Never ask for human input.
+            max_turns=1  # 한 번의 대화로 종료
         )
 
         # 응답에서 JSON 파싱
