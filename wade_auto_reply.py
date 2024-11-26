@@ -1,7 +1,7 @@
 import os
 from autogen import ConversableAgent
 
-os.environ['OPENAI_API_KEY'] = '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'
+os.environ['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
 
 llm_config = {
     "config_list": [
