@@ -22,29 +22,24 @@ llm_config = {
 # 템플릿 기반 프롬프트
 prompt_template = """
 당신의 역할은 주어진 데이터를 게임, 커뮤니티, 밈코인을 주제로 이 코인이 가질 효과를 분석하여 전문가 어조로 제공하는 것입니다.
-주어진 데이터가 은유적 표현이라도 잘 이해할 수 있으면 좋겠어.
+입력된 데이터의 언어를 감지해서 감지된 언어로 분석을 작성하세요
+그 후  데이터를 기반으로 토큰 이름과 심볼을 생성하세요.
 
-주어진 언어를 아래 규칙에 따라 응답해 주세요:
-1. 영어로 입력되면 영어로, 한국어로 입력되면 한국어로 대답하세요.
-2. 분석 및 결과는 반드시 주어진 언어로 작성해야 합니다.
+**반드시 아래 JSON 형식에 따라 정확히 응답하세요. JSON 형식 외의 텍스트는 포함하지 마세요.**
 
-데이터: {data}
-언어 : {lang}
-
-이후, 데이터를 기반으로 토큰 이름과 심볼을 생성하세요. 
-생성된 결과는 반드시 아래의 JSON 형식으로만 작성하세요:
-
-{{
-  "analysis": "여기에 분석 내용을 작성하세요. (200자 이내)",
+응답 형식:
+{
+  "analysis": "여기에 감지한 언어로 분석 내용을 작성하세요. (200자 이내)",
   "token_name": "생성된 토큰 이름",
   "token_symbol": "생성된 토큰 심볼"
-}}
+}
 """
 
 
 # 에이전트 생성
 assistant = AssistantAgent(
     name="MEME_WEMIX",
+    system_message=prompt_template,
     llm_config=llm_config
 )
 
@@ -63,18 +58,10 @@ class UserInput(BaseModel):
 @app.post("/process")
 async def process_input(input_data: UserInput):
     try:
-        input_language = detect(input_data.user_input)
-
-        # 사용자 요청 처리
-        user_message = prompt_template.format(
-            data=input_data.user_input,
-            lang=input_language,
-        )
-
         # 프롬프트 실행
         response = user_proxy.initiate_chat(
             assistant,
-            message=user_message,
+            message=input_data.user_input,
             human_input_mode="NEVER",  # Never ask for human input.
             max_turns=1  # 한 번의 대화로 종료
         )
