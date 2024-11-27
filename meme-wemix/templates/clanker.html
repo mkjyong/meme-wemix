@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clanker Viewer</title>
+    <script>
+        async function fetchClanker(address) {
+            const backendURL = "http://127.0.0.1:1214"; // 백엔드 URL
+
+            try {
+                const response = await fetch(`${backendURL}/api/clanker/${address}`);
+                if (!response.ok) throw new Error("Failed to fetch clanker");
+                const data = await response.json();
+
+                document.getElementById('name').innerText = data.name;
+                document.getElementById('address').innerText = address;
+                document.getElementById('description').innerText = data.description;
+                document.getElementById('image_url').innerText = data.image_url;
+
+            } catch (error) {
+                document.getElementById('content').innerText = "Error fetching clanker: " + error.message;
+            }
+        }
+
+        window.onload = () => fetchClanker("0x2f5E79469EbFfA1Ea73030cb23eB921C7BcB7091");
+    </script>
+</head>
+<body>
+    <h1>Clanker Viewer</h1>
+    <p id="name"></p>
+    <p id="address"></p>
+    <p id="description"></p>
+    <p id="image_url"></p>
+    <div id="content"></div>
+</body>
+</html>
