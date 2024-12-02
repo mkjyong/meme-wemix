@@ -142,7 +142,7 @@ async def process_input(input_data: UserInput):
             image_url=uploaded_image_url,
             creator_address="",
             transaction_hash="0x" + result['transaction_hash'],
-            description : analysis
+            description = analysis
         )
 
         # 출력
