@@ -140,6 +140,7 @@ async def process_input(input_data: UserInput):
             name=token_name,
             symbol=token_symbol,
             image_url=uploaded_image_url,
+            total_supply = "0",
             creator_address="",
             transaction_hash="0x" + result['transaction_hash'],
             description = analysis
