@@ -1,13 +1,40 @@
 import os
 import json
+import uuid
+import boto3
+import requests
+import pymysql
 
+from datetime import datetime
 from autogen import AssistantAgent, UserProxyAgent, ConversableAgent
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from pydantic import BaseModel
 from blockchain import deploy_token, check_connection
-from langdetect import detect
+from mimetypes import guess_type
+from io import BytesIO
 
 os.environ['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
+# AWS S3 설정
+S3_BUCKET_NAME = "meme-wemix-test"
+AWS_REGION = "ap-southeast-2"  # 서울 리전 예시
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
+AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
+
+# Boto3 클라이언트 초기화
+s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY,
+    region_name=AWS_REGION
+)
+
+db_connection = pymysql.connect(
+    host="%",          # 데이터베이스 호스트
+    user="meme-wemix",               # MySQL 사용자명
+    password=os.getenv("mysql_pwd"),  # MySQL 비밀번호
+    database="meme_wemix",  # 데이터베이스 이름
+    charset="utf8mb4"          # 문자 집합
+)
 
 llm_config = {
     "config_list": [
@@ -54,10 +81,43 @@ app = FastAPI()
 
 class UserInput(BaseModel):
     user_input: str
+    image_url: str = None  # image_url을 선택적으로 처리
 
 @app.post("/process")
 async def process_input(input_data: UserInput):
     try:
+        uploaded_image_url = None
+
+        if input_data.image_url.strip():  # URL이 비어 있지 않을 경우
+            response = requests.get(input_data.image_url, stream=True)
+            if response.status_code == 200:
+                # 파일 이름 추출
+                file_name = os.path.basename(input_data.image_url)
+                image_key = f"uploads/{uuid.uuid4()}-{file_name}"
+
+                # Content-Type 자동 추출
+                content_type, _ = guess_type(file_name)
+                if not content_type:
+                    content_type = "application/octet-stream"  # 기본값
+
+                # 메모리에 데이터 저장
+                image_data = BytesIO(response.content)
+
+                # S3에 업로드
+                s3_client.put_object(
+                    Bucket=S3_BUCKET_NAME,
+                    Key=image_key,
+                    Body=image_data.getvalue(),  # BytesIO 객체에서 바이트 데이터 추출
+                    ContentType=content_type  # Content-Type 설정
+                )
+
+                # 업로드된 이미지 URL
+                uploaded_image_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{image_key}"
+            else:
+                raise HTTPException(status_code=400, detail="Failed to fetch the image from the provided URL")
+
+
+
         # 프롬프트 실행
         response = user_proxy.initiate_chat(
             assistant,
@@ -73,18 +133,57 @@ async def process_input(input_data: UserInput):
         analysis = parsed_data["analysis"]
         token_name = parsed_data["token_name"]
         token_symbol = parsed_data["token_symbol"]
-        tx_hash = deploy_token(token_name, token_symbol, total_supply=1000000)
+        result = deploy_token(token_name, token_symbol, total_supply=1000000)
 
+        insert_token_info(
+            token_addr=result['contract_address'],
+            name=token_name,
+            symbol=token_symbol,
+            image_url=uploaded_image_url,
+            creator_address="",
+            transaction_hash="0x" + result['transaction_hash'],
+            description : analysis
+        )
 
         # 출력
         return {
             "analysis": analysis,
             "token_name": token_name,
             "token_symbol": token_symbol,
-            "transaction_hash": "0x" + tx_hash
-            "token_page" : "sss/" + tx_hash #token addr로 바꿔야함
+            "transaction_hash": "0x" + result['transaction_hash'],
+            "token_page" : "sss/" + result['contract_address'], #token addr로 바꿔야함
+            "image_url": uploaded_image_url  # 업로드된 이미지 URL 반환
         }
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format in response")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+# 생성된 정보를 MySQL에 삽입하는 함수
+def insert_token_info(token_addr, name, symbol, image_url, total_supply, creator_address, transaction_hash, description):
+    try:
+        with db_connection.cursor() as cursor:
+            # 삽입 SQL 쿼리
+            sql = """
+            INSERT INTO token_info (
+                token_addr, name, symbol, image_url, total_supply, creator_address, transaction_hash, created_at, description
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            # 현재 시간
+            created_at = datetime.now()
+
+            # 데이터 삽입
+            cursor.execute(sql, (token_addr, name, symbol, image_url, total_supply, creator_address, transaction_hash, created_at, description))
+
+        # 변경 사항 커밋
+        db_connection.commit()
+        print("Token information inserted successfully!")
+
+    except Exception as e:
+        print(f"Failed to insert token info: {e}")
+
+    finally:
+        db_connection.close()
