@@ -3,10 +3,8 @@ from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-
-
-# 토큰 데이터를 저장할 메모리 기반 데이터베이스 (간단한 예)
-tokens = []
+from databases import Database
+from sqlalchemy import MetaData, Table, Column, String, BigInteger, DECIMAL, TIMESTAMP, Text, create_engine
 
 # FastAPI 앱 생성
 app = FastAPI()
@@ -18,6 +16,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# MySQL 연결 설정
+DATABASE_URL = (
+    f"mysql+pymysql://meme-wemix:{os.getenv('mysql_pwd')}@localhost:3306/meme_wemix"
+)
+# 데이터베이스와 테이블 정의
+database = Database(DATABASE_URL)
+metadata = MetaData()
+
+token_info_table = Table(
+    "token_info",
+    metadata,
+    Column("record_id", BigInteger, primary_key=True, autoincrement=True),
+    Column("token_addr", String(255), nullable=False),
+    Column("name", String(255)),
+    Column("symbol", String(50)),
+    Column("image_url", String(2083)),
+    Column("total_supply", DECIMAL(38, 18)),
+    Column("creator_address", String(255)),
+    Column("transaction_hash", String(255)),
+    Column("created_at", TIMESTAMP),
+    Column("description", String(500)),
+)
+# SQLAlchemy 엔진 생성 (데이터베이스 초기화용)
+engine = create_engine(DATABASE_URL)
+metadata.create_all(engine)
+
+
+
 # 데이터 모델 정의
 class Token(BaseModel):
     name: str
@@ -25,34 +51,28 @@ class Token(BaseModel):
     total_supply: int
     transaction_hash: str
 
-@app.post("/tokens")
-async def add_token(token: Token):
-    tokens.append(token.dict())  # 토큰 추가
-    return {"message": "Token added successfully"}
 
-@app.get("/tokens")
+@app.on_event("startup")
+async def startup():
+    await database.connect()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await database.disconnect()
+
+
+@app.get("/api/token/{address}")
+async def get_token_info(token_addr: str):
+    query = token_info_table.select().where(token_info_table.c.token_addr == token_addr)
+    token_info = await database.fetch_one(query)
+    if token_info:
+        return token_info
+
+    raise HTTPException(status_code=404, detail="Token not found")
+
+@app.get("/api/tokens")
 async def list_tokens():
-    return tokens  # 모든 토큰 반환
-
-
-# 예제 데이터
-clankers = {
-    "0x2f5E79469EbFfA1Ea73030cb23eB921C7BcB7091": {
-        "name": "WADE TEST COIN",
-        "symbol": "WTC",
-        "description": "It is wade test coin.",
-        "image_url": "https://example.com/image1.png"
-    },
-    "0x3a5E79469EbFfA1Ea73030cb23eB921C7BcB7092": {
-        "name": "WEMADE FOREVER COIN",
-        "symbol": "WFC",
-        "description": "Another unique Clanker.",
-        "image_url": "https://example.com/image2.png"
-    }
-}
-
-@app.get("/api/clanker/{address}")
-async def get_clanker(address: str):
-    if address in clankers:
-        return clankers[address]
-    raise HTTPException(status_code=404, detail="Clanker not found")
+    query = token_info_table.select()
+    all_tokens = await database.fetch_all(query)
+    return all_tokens
