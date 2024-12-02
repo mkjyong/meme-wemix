@@ -31,7 +31,7 @@ def get_db_connection():
     return pymysql.connect(**db_config)
 
 
-@app.get("/api/token/{address}")
+@app.get("/api/token/{token_addr}")
 async def get_token_info(token_addr: str):
     connection = get_db_connection()
     try:
