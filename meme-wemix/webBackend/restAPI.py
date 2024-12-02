@@ -12,7 +12,7 @@ from databases import Database
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:1200"],  # 프론트엔드 주소
+    allow_origins=["http://localhost:1200"],  # 프론트엔드 주소
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
