@@ -56,9 +56,13 @@ def deploy_token(token_name, token_symbol, total_supply):
 
         # 트랜잭션 전송
         tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
 
         # 트랜잭션 해시 반환
-        return tx_hash.hex()
+        return {
+            "transaction_hash": tx_hash.hex(),
+            "contract_address": tx_receipt["contractAddress"]
+        }
     except Exception as e:
         print(f"Failed to deploy token: {e}")
         raise
