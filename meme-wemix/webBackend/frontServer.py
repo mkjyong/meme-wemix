@@ -17,4 +17,4 @@ async def home(request: Request):
 
 @app.get("/token/{address}", response_class=HTMLResponse)
 async def render_clanker_page(request: Request, address: str):
-    return templates.TemplateResponse("test.html", {"request": request, "address": address})
+    return templates.TemplateResponse("gameGameFun.html", {"request": request, "address": address})
