@@ -2,7 +2,7 @@ async function fetchClanker(address) {
     const backendURL = "http://127.0.0.1:1214"; // 백엔드 URL
 
     try {
-        const response = await fetch(`${backendURL}/api/clanker/${address}`);
+        const response = await fetch(`${backendURL}/api/token/${address}`);
         if (!response.ok) throw new Error("Failed to fetch clanker");
         const data = await response.json();
 
