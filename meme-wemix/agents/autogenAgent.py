@@ -149,7 +149,7 @@ async def process_input(input_data: UserInput):
         # 출력
         return {
             "analysis": analysis,
-            "token_addr" : token_addr,
+            "token_addr" : result['contract_address'],
             "token_name": token_name,
             "token_symbol": token_symbol,
             "transaction_hash": "0x" + result['transaction_hash'],
