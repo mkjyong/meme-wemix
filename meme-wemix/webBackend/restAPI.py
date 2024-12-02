@@ -20,7 +20,7 @@ app.add_middleware(
 
 # MySQL 연결 설정
 DATABASE_URL = (
-    f"mysql+pymysql://meme-wemix:{os.getenv('mysql_pwd')}@127.0.0.1:3306/meme_wemix"
+    f"mysql+pymysql://meme-wemix:{os.getenv('mysql_pwd')}@localhost:3306/meme_wemix"
 )
 # 데이터베이스와 테이블 정의
 database = Database(DATABASE_URL)
