@@ -1,3 +1,5 @@
+import os
+
 from pydantic import BaseModel
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
