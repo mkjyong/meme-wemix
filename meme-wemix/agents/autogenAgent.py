@@ -29,7 +29,7 @@ s3_client = boto3.client(
 )
 
 db_connection = pymysql.connect(
-    host="%",          # 데이터베이스 호스트
+    host="localhost",          # 데이터베이스 호스트
     user="meme-wemix",               # MySQL 사용자명
     password=os.getenv("mysql_pwd"),  # MySQL 비밀번호
     database="meme_wemix",  # 데이터베이스 이름
