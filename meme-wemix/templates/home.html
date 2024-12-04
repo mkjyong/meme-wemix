@@ -3,10 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home</title>
+    <title>GAME FUN</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.png">  <!-- favicon.ico 파일 경로 설정 -->
+    <link rel="stylesheet" href="/static/homeStyle.css"> <!-- 외부 CSS 파일 링크 -->
 </head>
 <body>
-    <h1>Welcome to the Clanker Viewer</h1>
-    <p>Go to <a href="/token/0x2f5E79469EbFfA1Ea73030cb23eB921C7BcB7091">Clanker Example</a></p>
+
+    <h1>Welcome to the WEMIX GAME FUN</h1>
+    <p>Go to our token : <a href="/token/0x117072fac52d732b01b53b8a12ffdc1395f34f91">$GAMEFUN</a></p>
+
+    <div class="content">
+        <div class="description">
+            <h3>WEB3 AI Assistant Agent in WEMIX</h3>
+            <p>Interact with our AI agent to use Web3 easily and just Play Game Fun!</p>
+        </div>
+
+        <!-- 채팅 인터페이스 -->
+        <div class="chat-container">
+            <div class="chat-box" id="chat-box">
+                <!-- 메시지가 여기에 추가됩니다 -->
+                <div class="message ai">AI: Welcome to WEMIX Game Fun. How can I assist you today?</div> <!-- 기본 메시지 -->
+            </div>
+            <div class="input-container">
+                <input type="text" id="user-input" placeholder="Ask your question..." />
+                <button id="send-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 엔터키로 메시지 전송
+        document.getElementById('user-input').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // 기본 Enter 키 동작 방지 (페이지 리로드 등)
+                handleSend(); // Send 버튼 클릭과 동일한 동작
+            }
+        });
+
+        document.getElementById('send-btn').addEventListener('click', function() {
+            handleSend();
+        });
+
+        function handleSend() {
+            const userInput = document.getElementById('user-input').value;
+            if (userInput.trim() !== "") {
+                // 유저 입력을 채팅 박스에 추가
+                const userMessage = document.createElement('div');
+                userMessage.className = 'message user';
+                userMessage.textContent = `You: ${userInput}`;
+                document.getElementById('chat-box').appendChild(userMessage);
+
+                // 입력 필드 초기화
+                document.getElementById('user-input').value = "";
+
+                // AI 응답 호출
+                fetchResponse(userInput);
+            }
+        }
+
+        async function fetchResponse(userInput) {
+            try {
+                // 실제로 AI 응답을 받아오는 코드
+                const response = await fetch(`/api/assistant?query=${encodeURIComponent(userInput)}`);
+                const data = await response.json();
+
+                // AI 응답을 채팅 박스에 추가
+                const aiMessage = document.createElement('div');
+                aiMessage.className = 'message ai';
+                aiMessage.textContent = `AI: ${data.response}`;
+                document.getElementById('chat-box').appendChild(aiMessage);
+
+                // 채팅 박스를 아래로 스크롤
+                const chatBox = document.getElementById('chat-box');
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } catch (error) {
+                console.error("Error fetching AI response:", error);
+            }
+        }
+    </script>
+
 </body>
 </html>
