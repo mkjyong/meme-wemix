@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} Details</title>  <!-- title을 템플릿 변수로 수정 -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.png">  <!-- favicon.ico 파일 경로 설정 -->
+    <link rel="stylesheet" href="/static/tokenDetail.css">
+</head>
+<body>
+    <div class="page-container">
+        <!-- 토큰 정보 섹션 -->
+        <div class="container token-section">
+            <img src="https://via.placeholder.com/150" alt="Token Image" class="token-image">
+            <div class="token-info">
+                <h1 class="token-name">
+                    Token Name <span class="token-symbol">(SYM)</span>
+                </h1>
+                <!-- <h1 class="token-name">Token Name <span class="proxy-tag">Proxy</span></h1> -->
+                <p class="requestor">Requestor: 12345</p>
+                <p class="address">Address: <span id="token-address" class="address-text">Loading...</span></p>
+                <p class="market-cap">Market Cap: <span class="market-value">$10,000</span></p>
+                <p class="description">Description: This is a sample token.</p>
+                <div class="card-actions">
+                    <button class="action-button">Add to Wallet</button>
+                    <button class="action-button">Share</button>
+                    <button class="action-button" onclick="openWemixScan()">WemixScan</button>
+                    <button class="action-button" onclick="openWemixPlay()">WemixPlay</button> <!-- 추가된 버튼 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 스왑 UI 섹션 -->
+        <div class="container swap-section">
+            <h1 class="swap-title">Swap your tokens</h1>
+            <div class="swap-box">
+                <!-- Buy Section -->
+                <div class="swap-row">
+                    <div class="swap-column">
+                        <label for="buy-input" class="swap-label">Buy</label>
+                        <input id="buy-input" type="number" placeholder="0" class="swap-input" />
+                        <div class="swap-value buy-value">$0.00</div> <!-- Buy 달러 가격 표시 -->
+                    </div>
+                    <div class="token-display">
+                        <span id="buy-token-name">WEMIX$</span> <!-- Buy 토큰 심볼 -->
+                    </div>
+                </div>
+        
+                <!-- Swap Direction Button -->
+                <div class="swap-arrow-container">
+                    <button class="swap-arrow-button" onclick="swapTokens()">⇅</button>
+                </div>
+        
+                <!-- Sell Section -->
+                <div class="swap-row">
+                    <div class="swap-column">
+                        <div class="swap-value sell-amount">0 Tokens</div> <!-- Sell 토큰 수량 표시 -->
+                        <div class="swap-value sell-value">$0.00</div> <!-- Sell 달러 가격 표시 -->
+                    </div>
+                    <div class="token-display">
+                        <span id="sell-token-name">Loading...</span> <!-- Sell 토큰 심볼 -->
+                    </div>
+                </div>
+        
+                <!-- Get Started Button -->
+                <button class="swap-button">Swap</button>
+            </div>
+            <p class="swap-description">
+                Swap your WEMIX$ with the token securely and instantly.
+            </p>
+        </div>
+        
+        
+    </div>
+    <script src="/static/tokenDetail.js"></script>
+</body>
+</html>
