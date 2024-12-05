@@ -7,9 +7,10 @@ import pymysql
 
 from datetime import datetime
 from autogen import AssistantAgent, UserProxyAgent, ConversableAgent
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from blockchain import deploy_token, check_connection
+from blockchain import deploy_token, blockchain_tool, check_connection
 from mimetypes import guess_type
 from io import BytesIO
 
@@ -28,13 +29,13 @@ s3_client = boto3.client(
     region_name=AWS_REGION
 )
 
-db_connection = pymysql.connect(
-    host="127.0.0.1",          # 데이터베이스 호스트
-    user="meme-wemix",               # MySQL 사용자명
-    password=os.getenv("mysql_pwd"),  # MySQL 비밀번호
-    database="meme_wemix",  # 데이터베이스 이름
-    charset="utf8mb4"          # 문자 집합
-)
+# db_connection = pymysql.connect(
+#     host="127.0.0.1",          # 데이터베이스 호스트
+#     user="meme-wemix",               # MySQL 사용자명
+#     password=os.getenv("mysql_pwd"),  # MySQL 비밀번호
+#     database="meme_wemix",  # 데이터베이스 이름
+#     charset="utf8mb4"          # 문자 집합
+# )
 
 llm_config = {
     "config_list": [
@@ -48,47 +49,74 @@ llm_config = {
 
 # 템플릿 기반 프롬프트
 prompt_template = """
-당신의 역할은 주어진 데이터를 게임, 커뮤니티, 밈코인을 주제로 이 코인이 가질 효과를 분석하여 전문가 어조로 제공하는 것입니다.
-입력된 데이터의 언어를 감지해서 감지된 언어로 분석을 작성하세요
-그 후  데이터를 기반으로 토큰 이름과 심볼을 생성하세요.
+당신은 범용적인 친절한 대화형 ai assistant입니다. 사용자의 요청에 따라 아래와 같은 역할을 수행할 수 있습니다. 그리고 항상 영어를 써.
+그리고 필수적으로 모든 응답 끝과 tool 사용 결과에 'TERMINATE' 를 함께 첨부해
 
-**반드시 아래 JSON 형식에 따라 정확히 응답하세요. JSON 형식 외의 텍스트는 포함하지 마세요.**
+1. "사용자가 제공하는 밈코인과 관련된 정보나 아이디어를 바탕으로, 해당 밈코인의 고유한 이름과 심볼을 생성해야 합니다. 3가지 추천을 제공해주고 유저에게 선택지를 제공하세요.
+이름과 심볼은 다음 형식으로 제시해주세요:
+- 이름: [제안된 이름]
+- 심볼: [제안된 심볼과 그 설명]
 
-응답 형식:
-{
-  "analysis": "여기에 감지한 언어로 분석 내용을 작성하세요. (200자 이내)",
-  "token_name": "생성된 토큰 이름",
-  "token_symbol": "생성된 토큰 심볼"
-}
+사용자가 주는 키워드나 주제를 반영하여 창의적이고 기억에 남는 이름과 심볼을 제안하세요.
+그리고 제안 중에 어떤걸 사용하게 할건지 다시 확인하세요
+
+2. 사용자가 다른 주제로 대화를 요청하면, 친절하고 유익한 대화로 응답하세요. 전문적이거나 일상적인 주제 모두 다룰 수 있습니다.
+
+3. 당신은 사용자의 요청에 따라 다양한 도구를 사용할 수 있는 AI입니다. 다음과 같은 도구를 사용할 수 있습니다:
+   1) **blockchain_tool**: 밈토큰을 블록체인에 배포하고 정보를 데이터베이스에 기록합니다.
+   - 이 도구는 오직 사용자가 배포하겠다고 명확히 동의한 경우에만 실행됩니다.
+
+
+
+**밈코인 분석 요청 시 응답 형식**:
+{ "analysis": "여기에 감지한 언어로 분석 내용을 작성하세요. (200자 이내)", "token_name": "생성된 토큰 이름", "token_symbol": "생성된 토큰 심볼명" }
+
+**기타 대화 요청 시**:
+- 일반 대화 형식으로 답변하세요.
 """
 
-
 # 에이전트 생성
-assistant = AssistantAgent(
+assistant = ConversableAgent(
     name="MEME_WEMIX",
     system_message=prompt_template,
     llm_config=llm_config
 )
 
-user_proxy = UserProxyAgent("user_proxy", code_execution_config=False)
+# Blockchain tool 등록
+assistant.register_for_llm(
+    name="blockchain_tool",
+    description="Deploys a token on the blockchain and records it in the database."
+)(blockchain_tool)
 
 
 
+# Session management (stores conversation state per user)
+user_agents = {}
 
 # FastAPI 앱 생성
 app = FastAPI()
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 모든 출처 허용 (보안이 중요한 경우 특정 도메인으로 제한)
+    allow_credentials=True,
+    allow_methods=["*"],  # 모든 HTTP 메서드 허용
+    allow_headers=["*"],  # 모든 HTTP 헤더 허용
+)
 
 
 class UserInput(BaseModel):
     user_input: str
     image_url: str = None  # image_url을 선택적으로 처리
 
-@app.post("/process")
-async def process_input(input_data: UserInput):
+@app.post("/chat")
+async def chat_conversation(request: Request, input_data: UserInput):
+    user_id = str(request.client.host)
+
     try:
         uploaded_image_url = None
 
-        if input_data.image_url.strip():  # URL이 비어 있지 않을 경우
+        if input_data.image_url and input_data.image_url.strip():
             response = requests.get(input_data.image_url, stream=True)
             if response.status_code == 200:
                 # 파일 이름 추출
@@ -113,53 +141,54 @@ async def process_input(input_data: UserInput):
 
                 # 업로드된 이미지 URL
                 uploaded_image_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{image_key}"
-            else:
-                raise HTTPException(status_code=400, detail="Failed to fetch the image from the provided URL")
 
 
+        # 사용자 세션 확인 및 초기화
+        if user_id not in user_agents:
+            # 새로운 대화 시작
+            user_proxy = ConversableAgent("user_proxy",  human_input_mode="NEVER", is_termination_msg=lambda msg: msg.get("content") is not None and "TERMINATE" in msg["content"])
+            user_proxy.register_for_execution(name="blockchain_tool")(blockchain_tool)
+            user_agents[user_id] = user_proxy
+        else:
+            # 기존 대화 이어가기
+            user_proxy = user_agents[user_id]
 
-        # 프롬프트 실행
+        # initiate_chat 호출
         response = user_proxy.initiate_chat(
             assistant,
-            message=input_data.user_input,
-            human_input_mode="NEVER",  # Never ask for human input.
-            max_turns=1  # 한 번의 대화로 종료
+            message=input_data.user_input,  # 사용자 입력
+            clear_history=False,  # 대화 내역 유지
         )
 
-        # 응답에서 JSON 파싱
-        parsed_data = json.loads(response.summary)
 
-        # 각 키의 값을 가져오기
-        analysis = parsed_data["analysis"]
-        token_name = parsed_data["token_name"]
-        token_symbol = parsed_data["token_symbol"]
-        result = deploy_token(token_name, token_symbol, total_supply=1000000)
+        # insert_token_info(
+        #     token_addr=result['contract_address'],
+        #     name=token_name,
+        #     symbol=token_symbol,
+        #     image_url=uploaded_image_url,
+        #     total_supply = "0",
+        #     creator_address="",
+        #     transaction_hash="0x" + result['transaction_hash'],
+        #     description = analysis
+        # )
 
-        insert_token_info(
-            token_addr=result['contract_address'],
-            name=token_name,
-            symbol=token_symbol,
-            image_url=uploaded_image_url,
-            total_supply = "0",
-            creator_address="",
-            transaction_hash="0x" + result['transaction_hash'],
-            description = analysis
-        )
-
-        # 출력
-        return {
-            "analysis": analysis,
-            "token_addr" : result['contract_address'],
-            "token_name": token_name,
-            "token_symbol": token_symbol,
-            "transaction_hash": "0x" + result['transaction_hash'],
-            "token_page" : "sss/" + result['contract_address'], #token addr로 바꿔야함
-            "image_url": uploaded_image_url  # 업로드된 이미지 URL 반환
-        }
+        return {"response": response.summary}
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format in response")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error in chat_conversation: {str(e)}")
+
+
+@app.post("/end")
+async def end_conversation(request: Request):
+    user_id = str(request.client.host)
+
+    if user_id in user_agents:
+        del user_agents[user_id]
+        return {"message": "Session ended."}
+    else:
+        return {"message": "Success"}
+
 
 
 
