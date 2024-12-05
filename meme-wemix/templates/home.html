@@ -6,6 +6,14 @@
     <title>GAME FUN</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.png">  <!-- favicon.ico 파일 경로 설정 -->
     <link rel="stylesheet" href="/static/homeStyle.css"> <!-- 외부 CSS 파일 링크 -->
+    <style>
+        /* 로딩 상태 표시 스타일 */
+        .loading {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
@@ -32,11 +40,31 @@
     </div>
 
     <script>
-        // 엔터키로 메시지 전송
+        window.addEventListener("beforeunload", async function (event) {
+            try {
+                // API 호출
+                await fetch("http://127.0.0.1:1201/end", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                });
+
+                // 추가적으로 메시지를 표시하려면 아래 코드 사용
+                event.preventDefault(); // 기본 동작 방지
+                event.returnValue = ""; // 대부분의 브라우저에서 이 메시지는 사용자에게 표시되지 않습니다.
+            } catch (error) {
+                console.error("Error calling API before unload:", error);
+            }
+        });
+
+        // 요청 중복 방지를 위한 플래그
+        let isFetching = false;
+
         document.getElementById('user-input').addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
                 event.preventDefault(); // 기본 Enter 키 동작 방지 (페이지 리로드 등)
-                handleSend(); // Send 버튼 클릭과 동일한 동작
+                handleSend();
             }
         });
 
@@ -45,8 +73,16 @@
         });
 
         function handleSend() {
-            const userInput = document.getElementById('user-input').value;
-            if (userInput.trim() !== "") {
+            const userInput = document.getElementById('user-input').value.trim();
+            const sendButton = document.getElementById('send-btn');
+
+            if (userInput !== "" && !isFetching) {
+                isFetching = true; // 요청 시작 플래그 설정
+
+                // 버튼 비활성화
+                sendButton.disabled = true;
+                sendButton.classList.add('loading');
+
                 // 유저 입력을 채팅 박스에 추가
                 const userMessage = document.createElement('div');
                 userMessage.className = 'message user';
@@ -56,29 +92,57 @@
                 // 입력 필드 초기화
                 document.getElementById('user-input').value = "";
 
+                // ** 스크롤을 아래로 내림 (유저 입력 시) **
+                scrollChatBox();
+
                 // AI 응답 호출
-                fetchResponse(userInput);
+                fetchResponse(userInput, "");
             }
         }
 
-        async function fetchResponse(userInput) {
+        async function fetchResponse(userInput, imageUrl) {
+            const sendButton = document.getElementById('send-btn');
             try {
-                // 실제로 AI 응답을 받아오는 코드
-                const response = await fetch(`/api/assistant?query=${encodeURIComponent(userInput)}`);
+                const payload = {
+                    user_input: userInput,
+                    image_url: imageUrl 
+                };
+
+                const response = await fetch(`http://127.0.0.1:1201/chat`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
                 const data = await response.json();
 
                 // AI 응답을 채팅 박스에 추가
                 const aiMessage = document.createElement('div');
                 aiMessage.className = 'message ai';
-                aiMessage.textContent = `AI: ${data.response}`;
+
+                aiMessage.innerHTML = `AI: ${data.response
+                    .replace(/\n/g, "<br>") // 줄바꿈 처리
+                    .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>") // **bold** 처리
+                }`;
+
                 document.getElementById('chat-box').appendChild(aiMessage);
 
-                // 채팅 박스를 아래로 스크롤
-                const chatBox = document.getElementById('chat-box');
-                chatBox.scrollTop = chatBox.scrollHeight;
+                // ** 스크롤을 아래로 내림 (AI 응답 시) **
+                scrollChatBox();
             } catch (error) {
                 console.error("Error fetching AI response:", error);
+            } finally {
+                isFetching = false; // 요청 완료 후 플래그 초기화
+                sendButton.disabled = false;
+                sendButton.classList.remove('loading');
             }
+        }
+
+        function scrollChatBox() {
+            const chatBox = document.getElementById('chat-box');
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 
