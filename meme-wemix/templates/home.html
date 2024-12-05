@@ -116,6 +116,10 @@
                     body: JSON.stringify(payload)
                 });
 
+                if (!response.ok) {
+                    throw new Error(`OPPS!! Network error! status: ${response.status}`);
+                }
+
                 const data = await response.json();
 
                 // AI 응답을 채팅 박스에 추가
