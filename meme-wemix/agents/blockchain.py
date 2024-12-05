@@ -34,7 +34,7 @@ def check_connection():
         raise Exception("Failed to connect to Blockchain.")
 
 # 토큰 배포 함수
-def deploy_token(token_name, token_symbol, total_supply):
+def deploy_token(token_name: str, token_symbol: str) -> dict:
     try:
         # ERC-20 계약 생성
         contract = web3.eth.contract(abi=erc20_abi, bytecode=erc20_bytecode)
@@ -66,3 +66,34 @@ def deploy_token(token_name, token_symbol, total_supply):
     except Exception as e:
         print(f"Failed to deploy token: {e}")
         raise
+
+
+# Blockchain tool function
+def blockchain_tool(token_name: str, token_symbol: str) -> dict:
+    try:
+        # Deploy the token (블록체인 배포 함수 호출)
+        result = deploy_token(token_name, token_symbol)
+
+        # 결과를 데이터베이스에 기록
+        # insert_token_info(
+        #     token_addr=result['contract_address'],
+        #     name=token_name,
+        #     symbol=token_symbol,
+        #     image_url=input_data.get("image_url", ""),
+        #     total_supply=str(total_supply),
+        #     creator_address=input_data.get("creator_address", ""),
+        #     transaction_hash="0x" + result['transaction_hash'],
+        #     description=input_data.get("description", "")
+        # )
+
+        # 결과 반환
+        return {
+            "token_addr": result['contract_address'],
+            "token_name": token_name,
+            "token_symbol": token_symbol,
+            "transaction_hash": "0x" + result['transaction_hash'],
+            # "total_supply": total_supply,
+            "message": "Token successfully minted and recorded in the database."
+        }
+    except Exception as e:
+        return {"error": str(e)}
